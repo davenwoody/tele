@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1,
+    "produkName": "CAPCUT PRO",
+    "produkId": "1",
+    "produkXuid": "26cc19b1-7ec1-4d0d-a03b-c25716805081",
+    "produkDeskripsi": "CAPCUT PRO PRICE"
+  },
+  {
+    "id": 2,
+    "produkName": "VIU",
+    "produkId": "2",
+    "produkXuid": "920d03f9-3f4a-4779-883e-94102cd654bd",
+    "produkDeskripsi": "VIU PREMIUM PRICE"
+  },
+  {
+    "id": 3,
+    "produkName": "BSTATION",
+    "produkId": "3",
+    "produkXuid": "0a045bb5-436f-4aa8-9b12-994c93b966aa",
+    "produkDeskripsi": "BSTATION PREMIUM PRICE"
+  }
+]

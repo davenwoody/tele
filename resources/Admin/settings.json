@@ -1,0 +1,22 @@
+{
+    "owner_chatid": "7033974218",
+    "store_name": "DAVENSTORE",
+    "data_qris": "00020101021126670016COM.NOBUBANK.WWW01189360050300000879140214627553842323710303UMI51440014ID.CO.QRIS.WWW0215ID20243219012980303UMI5204541153033605802ID5923MURTINI STORE OK16888746010TRENGGALEK61056631162070703A0163044545",
+    "invoice_logger": "-1002405924361",
+    "owner_usn": "@davenwo", 
+    "payment_type":{
+        "saweria": false,
+        "okeconect": true
+    },
+   "okeconect": {
+        "merchantid": "OK1688874", 
+        "signature": "647922917396810841688874OKCTB2CFB9971E1F9465A9CE01450ECF3988"
+      },
+    "stiker_start_fileid":"-",
+    "button_menu": {
+        "informasi": "🤖 Information",
+        "deposit": "💳 Deposit",
+        "list": "🛍️ List Produk",
+        "stock": "🛒 Stock"
+    }
+}
