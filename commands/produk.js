@@ -17,9 +17,6 @@
 // CLEANED BY t.me/metvamce
 // CLEANED BY t.me/metvamce
 // CLEANED BY t.me/metvamce
-// CLEANED BY t.me/metvamce
-// CLEANED BY t.me/metvamce
-// CLEANED BY t.me/metvamce
 const fs = require("fs");
 const { Markup } = require("telegraf");
 const userOrders = {};
@@ -28,7 +25,7 @@ const produkData = JSON.parse(
 );
 const { tambahKodeUnik } = require('../resources/netvance/netvancePay');
 // Tripay QRIS gateway
-const { createQrisInvoice } = require('../resources/payments/tripayQris');
+const { createQrisInvoice, createShopeePayLinkInvoice } = require('../resources/payments/tripayQris');
 const config = JSON.parse(fs.readFileSync('./resources/Admin/settings.json'))
 const moment = require("moment-timezone");
 const tanggal = moment()
@@ -326,16 +323,77 @@ module.exports = (bot, db) => {
               { show_alert: true }
             );
           }   
-		// Hit Tripay API to create dynamic QRIS invoice
-        const invoice = await createQrisInvoice({
-          reference: trxId,
-          amount: order.totalPrice + fee + kode_unik,
-          customerName: ctx.from.first_name || '-',
-          customerEmail: `${ctx.from.id}@telegram.user`
-        });
+		// Hit Tripay API: choose QRIS or ShopeePay link based on env PAYMENT_METHOD
+        const totalNominal = order.totalPrice + fee + kode_unik;
+        let invoice;
+        if (process.env.PAYMENT_METHOD === 'SHOPEE') {
+          invoice = await createShopeePayLinkInvoice({
+            reference: trxId,
+            amount: totalNominal,
+            customerName: ctx.from.first_name || '-',
+            customerEmail: `${ctx.from.id}@telegram.user`
+          });
+          console.log(invoice);
+
+          const payLink = invoice.checkout_url || invoice.payment_url;
+          const totalAmount = invoice.amount || totalNominal;
+
+          // Respond with link button (no QR code)
+          ctx.answerCbQuery('Link ShopeePay dibuat…', { show_alert: true });
+          ctx.deleteMessage();
+
+          await ctx.reply(`*PESANAN TERKONFIRMASI ✅*
+╭────────────────────╮  
+│ *Produk :* ${order.produk} 
+│ *Variasi :* ${order.varian}
+│ *Harga Satuan :* Rp. ${order.price.toLocaleString()}
+│ *ID Transaksi :* \`${order.trxid}\`
+├────────────────────  
+│ *Jumlah Pesanan:* x${jumlahPesanan}  
+│ *Total Pembayaran :* Rp. ${totalAmount.toLocaleString()}
+╰────────────────────╯  
+  
+Klik tombol di bawah untuk membuka ShopeePay dan lakukan pembayaran (kadaluarsa 5 menit).`, {
+            parse_mode: 'Markdown',
+            ...Markup.inlineKeyboard([
+              [Markup.button.url('🟧 Bayar via ShopeePay', payLink)],
+              [Markup.button.callback('❌ Batalkan Order', `batal_order1_${trxId}`)]
+            ])
+          });
+
+          // Add to session deposit for bookkeeping
+          var expired = await expiredTime();
+          addSessionDeposit(userOrders[chatId].trxid, {
+            userId: chatId,
+            depo_id: trxId,
+            produkId: userOrders[chatId].produkId,
+            idProduk: userOrders[chatId].idProduk,
+            id: userOrders[chatId].productId,
+            cart: userOrders[chatId].jumlahPesanan,
+            produk: userOrders[chatId].produk,
+            produk_nama: userOrders[chatId].varian,
+            fee: fee,
+            unik: kode_unik,
+            type: 'shopee',
+            total_amount: totalAmount,
+            payment_method: 'ShopeePay Link',
+            expired: expired,
+            chat: chatId,
+          });
+
+          return; // stop further QR processing
+        } else {
+          invoice = await createQrisInvoice({
+            reference: trxId,
+            amount: totalNominal,
+            customerName: ctx.from.first_name || '-',
+            customerEmail: `${ctx.from.id}@telegram.user`
+          });
+        }
+
         console.log(invoice);
         const qrisString = invoice.qr_content || invoice.qr_url; // fallback
-        const totalAmount = invoice.amount || (order.totalPrice + fee + kode_unik);
+        const totalAmount = invoice.amount || totalNominal;
       const outputFolder = path.join(__dirname, "../resources/database/qris");
       const outputFile = path.join(
         outputFolder,

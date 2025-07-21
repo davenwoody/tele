@@ -29,7 +29,8 @@ function makeSignature(merchantRef, amount) {
   return crypto.createHash('sha256').update(raw).digest('hex');
 }
 
-async function createQrisInvoice({
+async function createInvoice({
+  method = 'QRIS',
   reference, // unique order id
   amount, // integer
   customerName = '-',
@@ -42,7 +43,7 @@ async function createQrisInvoice({
   }
 
   const body = {
-    method: 'QRIS',
+    method,
     merchant_ref: reference,
     amount: amount,
     signature: makeSignature(reference, amount),
@@ -82,4 +83,14 @@ async function getTransactionDetail(reference) {
   return data?.data;
 }
 
-module.exports = { createQrisInvoice, getTransactionDetail };
+// Convenience wrappers
+async function createQrisInvoice(opts) {
+  return createInvoice({ ...opts, method: 'QRIS' });
+}
+
+async function createShopeePayLinkInvoice(opts) {
+  // According to Tripay docs, use method 'SPLINK' (ShopeePay Link)
+  return createInvoice({ ...opts, method: 'SPLINK' });
+}
+
+module.exports = { createInvoice, createQrisInvoice, createShopeePayLinkInvoice, getTransactionDetail };
