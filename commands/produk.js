@@ -16,23 +16,18 @@
 // CLEANED BY t.me/metvamce
 // CLEANED BY t.me/metvamce
 // CLEANED BY t.me/metvamce
-// CLEANED BY t.me/metvamce
-// CLEANED BY t.me/metvamce
-// CLEANED BY t.me/metvamce
-// CLEANED BY t.me/metvamce
-// CLEANED BY t.me/metvamce
-// CLEANED BY t.me/metvamce
-// CLEANED BY t.me/metvamce
-// CLEANED BY t.me/metvamce
-// CLEANED BY t.me/metvamce
-// CLEANED BY t.me/metvamce
 const fs = require("fs");
 const { Markup } = require("telegraf");
 const userOrders = {};
 const produkData = JSON.parse(
   fs.readFileSync("./resources/database/produk.json", "utf8")
 );
-const { tambahKodeUnik, generateQris  } = require('../resources/netvance/netvancePay');
+const { tambahKodeUnik, generateQris } = require('../resources/netvance/netvancePay');
+// (Optional) Tripay fallback – now disabled unless PAYMENT_PROVIDER='TRIPAY'
+let createQrisInvoice;
+try {
+  ({ createQrisInvoice } = require('../resources/payments/tripayQris'));
+} catch (_) {}
 const config = JSON.parse(fs.readFileSync('./resources/Admin/settings.json'))
 const moment = require("moment-timezone");
 const tanggal = moment()
@@ -297,10 +292,10 @@ module.exports = (bot, db) => {
     userOrders[chatId].trxid = trxId
     
     const orr = userOrders[userId]
-    const fee = 1
-    const unik = await tambahKodeUnik(process.env.KROPA_API, 'user', orr.totalPrice, 1)
-    const kode_unik = unik.kode_unik
-    console.log(kode_unik)
+    const fee = 1;
+    const unik = await tambahKodeUnik(process.env.KROPA_API, 'user', orr.totalPrice, 1);
+    const kode_unik = unik.kode_unik;
+    console.log(kode_unik);
     if (process.env.PAYMENT_SAWERIA === 'of') {
       const order = userOrders[userId];
       const productId = ctx.match[1];
@@ -330,13 +325,31 @@ module.exports = (bot, db) => {
               { show_alert: true }
             );
           }   
-		let response = await  generateQris(process.env.KROPA_API, order.totalPrice, 1, kode_unik, config.data_qris) 
- 		console.log(response)
-      const qrisString = response.qris_string;
+		// Buat QR dinamis langsung (tanpa Tripay) menggunakan data_qris merchant
+        const totalNominal = order.totalPrice + fee + kode_unik;
+
+        let qrisString;
+        let totalAmount = totalNominal;
+
+        if (process.env.PAYMENT_PROVIDER === 'TRIPAY' && createQrisInvoice) {
+          const invoice = await createQrisInvoice({
+            reference: trxId,
+            amount: totalNominal,
+            customerName: ctx.from.first_name || '-',
+            customerEmail: `${ctx.from.id}@telegram.user`
+          });
+          qrisString = invoice.qr_content || invoice.qr_url;
+          totalAmount = invoice.amount || totalNominal;
+        } else {
+          // Native QRIS generation (ShopeePay / all wallets)
+          const resp = await generateQris(process.env.KROPA_API, order.totalPrice, fee, kode_unik, config.data_qris);
+          qrisString = resp.qris_string;
+          totalAmount = resp.total;
+        }
       const outputFolder = path.join(__dirname, "../resources/database/qris");
       const outputFile = path.join(
         outputFolder,
-        `${response.qris_string}.png`
+        `${trxId}.png`
       );
 
       if (!fs.existsSync(outputFolder)) {
@@ -357,7 +370,7 @@ module.exports = (bot, db) => {
 │\`${order.trxid}\`
 ├────────────────────  
 │ *Jumlah Pesanan:* x${jumlahPesanan}  
-│ *Total Pembayaran :* Rp. ${response.total.toLocaleString()}
+│ *Total Pembayaran :* Rp. ${totalAmount.toLocaleString()}
 ╰────────────────────╯  
   
 *Pembayaran kadaluwarsa dalam 5 menit.  
@@ -395,7 +408,7 @@ function escapeMarkdownV2(text) {
     fee: fee,
     unik: kode_unik,
     type: "topup",
-    total_amount: response.total,
+    total_amount: totalAmount,
     payment_method: "QRIS",
     expired: expired,
     chat: chatId,
@@ -414,7 +427,7 @@ function escapeMarkdownV2(text) {
 ➜ *Total* : ${userOrders[ctx.chat.id]?.jumlahPesanan || 0}x
 ➜ *Payment Via* : QRIS
 ➜ *Trx ID :* \`${userOrders[userId].trxid}\`
-➜ *Amount :* ${ParseIdr(response.total)}
+➜ *Amount :* ${ParseIdr(totalAmount)}
 ➜ *Tanggal :* ${tanggal} ${jam}`),
     {
       parse_mode: "MarkdownV2",
